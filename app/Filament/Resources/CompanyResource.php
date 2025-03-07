@@ -3,88 +3,70 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\CompanyResource\Pages;
+use App\Filament\Resources\CompanyResource\RelationManagers;
+use App\Filament\Resources\CompanyResource\RelationManagers\AreasRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\BranchesRelationManager;
+use App\Filament\Resources\CompanyResource\RelationManagers\StaffsRelationManager;
 use App\Models\Company;
 use Filament\Forms;
-use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Section;
-use Filament\Forms\Components\Split;
-use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Infolists\Components\ImageEntry;
+use Filament\Infolists\Components\Section;
+use Filament\Infolists\Components\Split;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
-use Filament\Tables\Actions\BulkActionGroup;
-use Filament\Tables\Actions\DeleteAction;
-use Filament\Tables\Actions\DeleteBulkAction;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ViewAction;
+use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Auth;
 use Ysfkaya\FilamentPhoneInput\Forms\PhoneInput;
 use Ysfkaya\FilamentPhoneInput\Infolists\PhoneEntry;
+use Ysfkaya\FilamentPhoneInput\PhoneInputNumberType;
 use Ysfkaya\FilamentPhoneInput\Tables\PhoneColumn;
 
 class CompanyResource extends Resource
 {
     protected static ?string $model = Company::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
+    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                Split::make([
-                    Section::make()
+                Forms\Components\Split::make([
+
+                    Forms\Components\Section::make('Company Details')
                         ->schema([
                             TextInput::make('name')
-                                ->columnSpan(2)
-                                ->label('Company Name'),
-                            TextInput::make('slug'),
-
-                            TextInput::make('registration_number')
-                                ->columnSpan(1)
-                                ->label('Registration Number'),
-                            TextInput::make('tax_id')
-                                ->columnSpan(1)
-                                ->label('Tax ID'),
-                            PhoneInput::make('phone_number')
+                                ->unique(Company::class, 'name',fn ($record) => $record)
+                                ->required(),
+                            TextInput::make('address')
+                                ->required(),
+                            PhoneInput::make('phone')
                                 ->onlyCountries(['PH'])
-                                ->unique(Company::class, 'phone_number', fn($record) => $record)
+                                ->unique(Company::class, 'phone',fn ($record) => $record)
                                 ->required(),
                             TextInput::make('email')
+                                ->required()
+                                ->unique(Company::class, 'email',fn ($record) => $record)
+                                ->prefixIcon('heroicon-s-envelope')
                                 ->email(),
-                            TextInput::make('website')
-                                ->url()
-                                ->suffixIcon('heroicon-m-globe-alt'),
-                            Forms\Components\Select::make('status')
-                                ->options([
-                                    'inactive' => 'Inactive',
-                                    'active' => 'Active',
-                                    'suspended' => 'Suspended',
-                                ])
-                                ->native(false)
-                                ->default('active'),
-                            Textarea::make('address')
-                                ->rows(4)
-                                ->columnSpan(2),
-                        ])->columns(2),
-                    Section::make('Company Logo')
+                        ])->grow(true),
+                    Forms\Components\Section::make('Company Logo')
                         ->columns(2)
                         ->schema([
-                            FileUpload::make('logo')
+                            Forms\Components\FileUpload::make('avatar_url')
                                 ->image()
                                 ->avatar()
-                                ->alignCenter()
                                 ->rules(['image', 'max:1024'])
                                 ->required(),
                         ])->grow(false),
-                ])->columnSpan([
-                    'sm' => 2,
-                    'md' => 3,
-                ])
+                ])->columnSpan(3)
             ]);
     }
 
@@ -93,29 +75,67 @@ class CompanyResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('name'),
-                TextColumn::make('registration_number'),
-                PhoneColumn::make('tax_id'),
+                TextColumn::make('address'),
+                PhoneColumn::make('phone'),
                 TextColumn::make('email'),
             ])
             ->filters([
                 //
             ])
             ->actions([
-                ViewAction::make(),
-                EditAction::make(),
-                DeleteAction::make(),
+                Tables\Actions\ViewAction::make(),
+                Tables\Actions\EditAction::make(),
+                Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make(),
                 ]),
+            ]);
+    }
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                Split::make([
+                    Section::make('Company Information')
+                        ->columns(2)
+                        ->schema([
+                            TextEntry::make('name')
+                                ->label("Company Name"),
+                            TextEntry::make('address')
+                                ->label("Company Address"),
+                            PhoneEntry::make('phone')
+                                ->label('Company Phone Number'),
+                            TextEntry::make('email')
+                                ->label("Company Email Address"),
+                            TextEntry::make('setting.interest_rate')
+                                ->suffix('%')
+                                ->label("Interest Rate"),
+                        ]),
+                    Section::make([
+                        Section::make([
+                            ImageEntry::make('avatar_url')
+                                ->circular()
+                                ->label('Company Logo'),
+                        ]),
+                        Section::make([
+                            TextEntry::make('created_at')
+                                ->label('Created At'),
+                        ])
+                    ])->grow(false)
+                ])->columnSpan(3)
             ]);
     }
 
     public static function getRelations(): array
     {
         return [
-            BranchesRelationManager::class
+            RelationManagers\SettingRelationManager::class,
+            BranchesRelationManager::class,
+            StaffsRelationManager::class,
+
         ];
     }
 
@@ -125,6 +145,7 @@ class CompanyResource extends Resource
             'index' => Pages\ListCompanies::route('/'),
             'create' => Pages\CreateCompany::route('/create'),
             'edit' => Pages\EditCompany::route('/{record}/edit'),
+            'view' => Pages\ViewCompany::route('/{record}'),
         ];
     }
 }

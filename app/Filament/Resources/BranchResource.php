@@ -8,9 +8,12 @@ use App\Models\Branch;
 use App\Models\Company;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Infolists\Components\Section;
+use Filament\Infolists\Components\Split;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -30,30 +33,15 @@ class BranchResource extends Resource
                         Forms\Components\TextInput::make('name')
                             ->required()
                             ->maxLength(255),
-                        Forms\Components\TextInput::make('slug')
-                            ->required()
-                            ->maxLength(255),
-                        Forms\Components\Select::make('status')
-                            ->options([
-                                'active' => 'Active',
-                                'inactive' => 'Inactive',
-                                'suspended' => 'Suspended',
-                            ])
-                            ->native(false)
-                            ->default('inactive')
-                            ->required(),
                         Forms\Components\Select::make('company_id')
                             ->options(
-                                Company::pluck('name', 'id')
+                                Company::all()->pluck('name', 'id')
                             )
                             ->native(false)
                             ->required()
                             ->label('Company'),
-                        Forms\Components\Textarea::make('address')
-                            ->rows(3)
-                            ->required(),
+                        ]),
 
-                    ]),
             ]);
     }
 
@@ -61,22 +49,15 @@ class BranchResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('name'),
-                TextColumn::make('company.name')
+                Tables\Columns\TextColumn::make('name'),
+                Tables\Columns\TextColumn::make('company.name')
                     ->label('Company'),
-                TextColumn::make('status')
-                    ->badge()
-                    ->formatStateUsing(fn (string $state): string => __(ucfirst($state)))
-                    ->color(fn (string $state): string => match ($state) {
-                        'active' => 'success',
-                        'inactive' => 'warning',
-                        'suspended' => 'danger',
-                    })
             ])
             ->filters([
                 //
             ])
             ->actions([
+                Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
@@ -86,10 +67,30 @@ class BranchResource extends Resource
             ]);
     }
 
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                Split::make([
+                    Section::make('Branch Information')
+                    ->columns(2)
+                    ->schema([
+                        TextEntry::make('name'),
+                        TextEntry::make('company.name')
+                            ->label('Company'),
+                    ]),
+                    Section::make([
+                        TextEntry::make('created_at')
+                            ->label('Created At'),
+                    ])->grow(false)
+                ])->columnSpan(3)
+            ]);
+    }
+
     public static function getRelations(): array
     {
         return [
-            //
+            RelationManagers\AreasRelationManager::class
         ];
     }
 
@@ -99,6 +100,7 @@ class BranchResource extends Resource
             'index' => Pages\ListBranches::route('/'),
             'create' => Pages\CreateBranch::route('/create'),
             'edit' => Pages\EditBranch::route('/{record}/edit'),
+            'view' => Pages\ViewBranch::route('/{record}'),
         ];
     }
 }

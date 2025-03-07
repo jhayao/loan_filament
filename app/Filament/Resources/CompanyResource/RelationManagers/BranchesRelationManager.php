@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\CompanyResource\RelationManagers;
 
+use App\Filament\Resources\BranchResource;
+use App\Models\Branch;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -30,6 +32,8 @@ class BranchesRelationManager extends RelationManager
             ->recordTitleAttribute('name')
             ->columns([
                 Tables\Columns\TextColumn::make('name'),
+                Tables\Columns\TextColumn::make('company.name')
+                    ->label('Company'),
             ])
             ->filters([
                 //
@@ -38,7 +42,11 @@ class BranchesRelationManager extends RelationManager
                 Tables\Actions\CreateAction::make(),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\ViewAction::make()
+                    ->label('')
+                    ->url(fn(Branch $branch): string => BranchResource::getUrl('view', ['record' => $branch->getKey()])),
+                Tables\Actions\EditAction::make()
+                    ->url(fn (Branch $branch): string => BranchResource::getUrl('edit',['record'=>$branch->getKey()])),
                 Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
